@@ -1,30 +1,10 @@
 import { System, StateModule } from '../GameEngine';
 import Logger from '../Logger';
 import { GameState } from '../GameState';
-import fs from 'fs';
-import path from 'path';
+import { Ship, ShipUpgrade } from '../types';
+import { loadJSONFile } from '../fileLoader';
 import { InventorySystem } from './InventorySystem';
 
-interface Ship {
-    name: string;
-    model: string;
-    cargoCapacity: number;
-    fuelCapacity: number;
-    fuelEfficiency: number;
-    speed: number;
-    health: number;
-    maxHealth: number;
-}
-
-type ShipProperty = keyof Omit<Ship, 'name' | 'model'>;
-
-interface ShipUpgrade {
-    id: string;
-    name: string;
-    description: string;
-    cost: number;
-    effect: Partial<Record<ShipProperty, number>>;
-}
 class ShipStateModule implements StateModule {
     ship: Ship;
     currentFuel: number;
@@ -36,8 +16,7 @@ class ShipStateModule implements StateModule {
     }
 
     private loadInitialShipData(): Ship {
-        const data = fs.readFileSync(path.join(process.cwd(), 'content', 'initial-ship.json'), 'utf8');
-        return JSON.parse(data);
+        return loadJSONFile<Ship>('initial-ship.json');
     }
 
     serialize(): any {
@@ -77,8 +56,7 @@ export class ShipSystem implements System {
     }
 
     private loadUpgrades(): ShipUpgrade[] {
-        const data = fs.readFileSync(path.join(process.cwd(), 'content', 'ship-upgrades.json'), 'utf8');
-        return JSON.parse(data);
+        return loadJSONFile<ShipUpgrade[]>('ship-upgrades.json');
     }
 
     getShipInfo(): Ship {
@@ -152,9 +130,9 @@ export class ShipSystem implements System {
         }
 
         // Apply the upgrade effects
-        (Object.entries(upgrade.effect) as [ShipProperty, number][]).forEach(([key, value]) => {
-            if (key in this.state.ship && typeof this.state.ship[key] === 'number') {
-                (this.state.ship[key] as number) += value;
+        Object.entries(upgrade.effect).forEach(([key, value]) => {
+            if (key in this.state.ship && typeof this.state.ship[key as keyof Ship] === 'number') {
+                (this.state.ship[key as keyof Ship] as number) += value;
             }
         });
 

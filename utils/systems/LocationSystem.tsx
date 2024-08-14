@@ -1,18 +1,8 @@
 import { System, StateModule } from '../GameEngine';
 import Logger from '../Logger';
 import { GameState } from '../GameState';
-import fs from 'fs';
-import path from 'path';
-
-interface Location {
-    id: string;
-    name: string;
-    coordinates: { x: number; y: number; z: number };
-    description: string;
-    dominantSpecies: string;
-    economyType: string;
-    securityLevel: string;
-}
+import { Location } from '../types';
+import { loadJSONFile } from '../fileLoader';
 
 class LocationStateModule implements StateModule {
     locations: Location[] = [];
@@ -54,8 +44,7 @@ export class LocationSystem implements System {
 
     private loadLocations(): void {
         try {
-            const data = fs.readFileSync(path.join(process.cwd(), 'content', 'locations.json'), 'utf8');
-            this.state.locations = JSON.parse(data);
+            this.state.locations = loadJSONFile<Location[]>('locations.json');
             Logger.log(`Loaded ${this.state.locations.length} locations`, 'INFO');
         } catch (error) {
             Logger.error(`Failed to load locations: ${error}`);
@@ -81,7 +70,6 @@ export class LocationSystem implements System {
         const currentLocation = this.getCurrentLocation();
         if (currentLocation) {
             const distance = this.calculateDistance(currentLocation, targetLocation);
-            // Here you could add logic to check if the player has enough fuel, time, etc. to make the journey
             Logger.log(`Traveling from ${currentLocation.name} to ${targetLocation.name}. Distance: ${distance.toFixed(2)} units`, 'INFO');
         }
 
@@ -98,7 +86,6 @@ export class LocationSystem implements System {
     }
 
     getAvailableLocations(): Location[] {
-        // In a more complex game, you might want to filter locations based on player's ship range, known routes, etc.
         return this.state.locations.filter(loc => loc.id !== this.state.currentLocationId);
     }
 

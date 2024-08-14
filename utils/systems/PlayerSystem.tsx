@@ -1,57 +1,38 @@
 import { System, StateModule } from '../GameEngine';
 import Logger from '../Logger';
 import { GameState } from '../GameState';
-
-interface PlayerShip {
-    name: string;
-    cargoCapacity: number;
-    fuelCapacity: number;
-    speed: number;
-}
-
-interface InventoryItem {
-    goodId: string;
-    quantity: number;
-}
+import { Ship, InventoryItem } from '../types';
+import { InventorySystem } from './InventorySystem';
+import { ShipSystem } from './ShipSystem';
 
 class PlayerStateModule implements StateModule {
     name: string = '';
     credits: number = 0;
-    ship: PlayerShip = {
-        name: 'Starter Ship',
-        cargoCapacity: 100,
-        fuelCapacity: 100,
-        speed: 1
-    };
-    inventory: InventoryItem[] = [];
-    currentFuel: number = 100;
 
     serialize(): any {
         return {
             name: this.name,
-            credits: this.credits,
-            ship: this.ship,
-            inventory: this.inventory,
-            currentFuel: this.currentFuel
+            credits: this.credits
         };
     }
 
     deserialize(data: any): void {
         this.name = data.name;
         this.credits = data.credits;
-        this.ship = data.ship;
-        this.inventory = data.inventory;
-        this.currentFuel = data.currentFuel;
     }
 }
 
 export class PlayerSystem implements System {
     private state: PlayerStateModule;
     private gameState: GameState;
+    private inventorySystem: InventorySystem;
+    private shipSystem: ShipSystem;
 
-    constructor(gameState: GameState) {
+    constructor(gameState: GameState, inventorySystem: InventorySystem, shipSystem: ShipSystem) {
         this.state = new PlayerStateModule();
         this.gameState = gameState;
+        this.inventorySystem = inventorySystem;
+        this.shipSystem = shipSystem;
     }
 
     initialize(): void {
@@ -92,74 +73,43 @@ export class PlayerSystem implements System {
         }
     }
 
-    getShip(): PlayerShip {
-        return this.state.ship;
+    getShip(): Ship {
+        return this.shipSystem.getShipInfo();
     }
 
-    upgradeShip(upgrades: Partial<PlayerShip>): void {
-        Object.assign(this.state.ship, upgrades);
-        Logger.log(`Ship upgraded. New stats: ${JSON.stringify(this.state.ship)}`, 'INFO');
+    upgradeShip(upgradeId: string): boolean {
+        return this.shipSystem.applyUpgrade(upgradeId);
     }
 
     getInventory(): InventoryItem[] {
-        return this.state.inventory;
+        return this.inventorySystem.getInventory();
     }
 
     addToInventory(goodId: string, quantity: number): boolean {
-        const currentCargo = this.getCurrentCargoLoad();
-        if (currentCargo + quantity > this.state.ship.cargoCapacity) {
-            Logger.log(`Cannot add ${quantity} of ${goodId}. Exceeds cargo capacity.`, 'WARN');
-            return false;
-        }
-
-        const existingItem = this.state.inventory.find(item => item.goodId === goodId);
-        if (existingItem) {
-            existingItem.quantity += quantity;
-        } else {
-            this.state.inventory.push({ goodId, quantity });
-        }
-        Logger.log(`Added ${quantity} of ${goodId} to inventory`, 'INFO');
-        return true;
+        return this.inventorySystem.addItem(goodId, quantity);
     }
 
     removeFromInventory(goodId: string, quantity: number): boolean {
-        const existingItem = this.state.inventory.find(item => item.goodId === goodId);
-        if (!existingItem || existingItem.quantity < quantity) {
-            Logger.log(`Cannot remove ${quantity} of ${goodId} from inventory. Insufficient quantity.`, 'WARN');
-            return false;
-        }
-
-        existingItem.quantity -= quantity;
-        if (existingItem.quantity === 0) {
-            this.state.inventory = this.state.inventory.filter(item => item.goodId !== goodId);
-        }
-        Logger.log(`Removed ${quantity} of ${goodId} from inventory`, 'INFO');
-        return true;
+        return this.inventorySystem.removeItem(goodId, quantity);
     }
 
     getCurrentCargoLoad(): number {
-        return this.state.inventory.reduce((total, item) => total + item.quantity, 0);
+        return this.shipSystem.getCurrentCargoLoad();
+    }
+
+    getRemainingCargoCapacity(): number {
+        return this.shipSystem.getRemainingCargoCapacity();
     }
 
     getFuelLevel(): number {
-        return this.state.currentFuel;
+        return this.shipSystem.getFuelLevel();
     }
 
-    consumeFuel(amount: number): boolean {
-        if (this.state.currentFuel >= amount) {
-            this.state.currentFuel -= amount;
-            Logger.log(`Consumed ${amount} fuel. Remaining: ${this.state.currentFuel}`, 'INFO');
-            return true;
-        } else {
-            Logger.log(`Insufficient fuel. Required: ${amount}, Available: ${this.state.currentFuel}`, 'WARN');
-            return false;
-        }
+    refuel(amount: number): number {
+        return this.shipSystem.refuel(amount);
     }
 
-    refuel(amount: number): void {
-        const maxRefuel = this.state.ship.fuelCapacity - this.state.currentFuel;
-        const actualRefuel = Math.min(amount, maxRefuel);
-        this.state.currentFuel += actualRefuel;
-        Logger.log(`Refueled ${actualRefuel}. Current fuel: ${this.state.currentFuel}`, 'INFO');
+    travel(distance: number): boolean {
+        return this.shipSystem.travel(distance);
     }
 }

@@ -8,7 +8,11 @@ export interface Location {
     economyType: string;
     securityLevel: string;
   }
-  
+  export interface InventoryItem {
+    goodId: string;
+    quantity: number;
+    price: number;  // Add this line
+  }
   export interface Trader {
     id: string;
     name: string;

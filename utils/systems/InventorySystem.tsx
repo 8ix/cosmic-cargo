@@ -1,26 +1,8 @@
 import { System, StateModule } from '../GameEngine';
 import Logger from '../Logger';
 import { GameState } from '../GameState';
-import fs from 'fs';
-import path from 'path';
-
-interface InventoryItem {
-    id: string;
-    name: string;
-    quantity: number;
-    weight: number;
-}
-
-interface GoodData {
-    id: string;
-    name: string;
-    weight: number;
-    basePrice?: number;
-    lifespan?: number | null;
-    contraband?: boolean;
-    rarity?: number;
-    traderAffinity?: { [key: string]: number };
-}
+import { InventoryItem, Good } from '../types';
+import { loadJSONFile } from '../fileLoader';
 
 class InventoryStateModule implements StateModule {
     items: InventoryItem[] = [];
@@ -39,7 +21,7 @@ class InventoryStateModule implements StateModule {
 export class InventorySystem implements System {
     private state: InventoryStateModule;
     private gameState: GameState;
-    private goodsData: { [key: string]: { name: string; weight: number } };
+    private goodsData: { [key: string]: Good };
 
     constructor(gameState: GameState) {
         this.state = new InventoryStateModule();
@@ -55,11 +37,10 @@ export class InventorySystem implements System {
         return this.state;
     }
 
-    private loadGoodsData(): { [key: string]: { name: string; weight: number } } {
-        const data = fs.readFileSync(path.join(process.cwd(), 'content', 'goods.json'), 'utf8');
-        const goods: GoodData[] = JSON.parse(data);
-        return goods.reduce((acc: { [key: string]: { name: string; weight: number } }, good: GoodData) => {
-            acc[good.id] = { name: good.name, weight: good.weight };
+    private loadGoodsData(): { [key: string]: Good } {
+        const goods: Good[] = loadJSONFile<Good[]>('goods.json');
+        return goods.reduce((acc: { [key: string]: Good }, good: Good) => {
+            acc[good.id] = good;
             return acc;
         }, {});
     }
@@ -70,15 +51,13 @@ export class InventorySystem implements System {
             return false;
         }
 
-        const existingItem = this.state.items.find(item => item.id === itemId);
+        const existingItem = this.state.items.find(item => item.goodId === itemId);
         if (existingItem) {
             existingItem.quantity += quantity;
         } else {
             this.state.items.push({
-                id: itemId,
-                name: this.goodsData[itemId].name,
-                quantity: quantity,
-                weight: this.goodsData[itemId].weight
+                goodId: itemId,
+                quantity: quantity
             });
         }
 
@@ -87,7 +66,7 @@ export class InventorySystem implements System {
     }
 
     removeItem(itemId: string, quantity: number): boolean {
-        const existingItem = this.state.items.find(item => item.id === itemId);
+        const existingItem = this.state.items.find(item => item.goodId === itemId);
         if (!existingItem || existingItem.quantity < quantity) {
             Logger.log(`Cannot remove ${quantity} of ${itemId} from inventory. Insufficient quantity.`, 'WARN');
             return false;
@@ -95,7 +74,7 @@ export class InventorySystem implements System {
 
         existingItem.quantity -= quantity;
         if (existingItem.quantity === 0) {
-            this.state.items = this.state.items.filter(item => item.id !== itemId);
+            this.state.items = this.state.items.filter(item => item.goodId !== itemId);
         }
 
         Logger.log(`Removed ${quantity} of ${this.goodsData[itemId].name} from inventory`, 'INFO');
@@ -107,11 +86,11 @@ export class InventorySystem implements System {
     }
 
     getTotalWeight(): number {
-        return this.state.items.reduce((total, item) => total + item.quantity * item.weight, 0);
+        return this.state.items.reduce((total, item) => total + item.quantity * this.goodsData[item.goodId].weight, 0);
     }
 
     getItemQuantity(itemId: string): number {
-        const item = this.state.items.find(item => item.id === itemId);
+        const item = this.state.items.find(item => item.goodId === itemId);
         return item ? item.quantity : 0;
     }
 

@@ -1,43 +1,12 @@
 import { System, StateModule } from '../GameEngine';
 import Logger from '../Logger';
 import { GameState } from '../GameState';
-import fs from 'fs';
-import path from 'path';
-
-interface Trader {
-  id: string;
-  name: string;
-  species: string;
-  location: string;
-  specialization: string;
-  reputation: number;
-  inventorySize: number;
-  restockFrequency: number;
-}
-
-interface Good {
-  id: string;
-  name: string;
-  basePrice: number;
-  weight: number;
-  lifespan: number | null;
-  contraband: boolean;
-  rarity: number;
-  traderAffinity: { [key: string]: number };
-}
-
-interface Location {
-  id: string;
-  name: string;
-  coordinates: { x: number; y: number; z: number };
-  description: string;
-  dominantSpecies: string;
-  economyType: string;
-  securityLevel: string;
-}
+import { Trader, Good, Location, InventoryItem } from '../types';
+import { loadJSONFile } from '../fileLoader';
+import { EconomySystem } from './EconomySystem';
 
 interface TraderInventory {
-  [traderId: string]: { goodId: string; quantity: number }[];
+  [traderId: string]: InventoryItem[];
 }
 
 class TraderStateModule implements StateModule {
@@ -55,16 +24,19 @@ class TraderStateModule implements StateModule {
       this.traders = data.traders;
       this.inventories = data.inventories;
     }
-  }
+}
+
 export class TraderSystem implements System {
   private state: TraderStateModule;
   private gameState: GameState;
   private goods: Good[] = [];
   private locations: Location[] = [];
+  private economySystem: EconomySystem;
 
-  constructor(gameState: GameState) {
+  constructor(gameState: GameState, economySystem: EconomySystem) {
     this.state = new TraderStateModule();
     this.gameState = gameState;
+    this.economySystem = economySystem;
   }
 
   initialize(): void {
@@ -76,8 +48,12 @@ export class TraderSystem implements System {
   }
 
   update(): void {
-    // Here we could implement logic for updating trader inventories based on restockFrequency
-    // This method would be called regularly by the game loop
+    // Implement logic for updating trader inventories based on restockFrequency
+    this.state.traders.forEach(trader => {
+      if (Math.random() < 1 / trader.restockFrequency) {
+        this.restockTrader(trader);
+      }
+    });
   }
 
   getStateModule(): StateModule {
@@ -86,8 +62,7 @@ export class TraderSystem implements System {
 
   private loadTraders(): void {
     try {
-      const data = fs.readFileSync(path.join(process.cwd(), 'content', 'traders.json'), 'utf8');
-      this.state.traders = JSON.parse(data);
+      this.state.traders = loadJSONFile<Trader[]>('traders.json');
       Logger.log(`Loaded ${this.state.traders.length} traders`, 'INFO');
     } catch (error) {
       Logger.error(`Failed to load traders: ${error}`);
@@ -96,8 +71,7 @@ export class TraderSystem implements System {
 
   private loadGoods(): void {
     try {
-      const data = fs.readFileSync(path.join(process.cwd(), 'content', 'goods.json'), 'utf8');
-      this.goods = JSON.parse(data);
+      this.goods = loadJSONFile<Good[]>('goods.json');
       Logger.log(`Loaded ${this.goods.length} goods`, 'INFO');
     } catch (error) {
       Logger.error(`Failed to load goods: ${error}`);
@@ -106,8 +80,7 @@ export class TraderSystem implements System {
 
   private loadLocations(): void {
     try {
-      const data = fs.readFileSync(path.join(process.cwd(), 'content', 'locations.json'), 'utf8');
-      this.locations = JSON.parse(data);
+      this.locations = loadJSONFile<Location[]>('locations.json');
       Logger.log(`Loaded ${this.locations.length} locations`, 'INFO');
     } catch (error) {
       Logger.error(`Failed to load locations: ${error}`);
@@ -125,8 +98,8 @@ export class TraderSystem implements System {
     }
   }
 
-  private generateInventory(trader: Trader, location: Location): { goodId: string; quantity: number }[] {
-    const inventory: { goodId: string; quantity: number }[] = [];
+  private generateInventory(trader: Trader, location: Location): InventoryItem[] {
+    const inventory: InventoryItem[] = [];
     let remainingSpace = trader.inventorySize;
 
     for (const good of this.goods) {
@@ -134,7 +107,8 @@ export class TraderSystem implements System {
       if (Math.random() < stockProbability) {
         const maxQuantity = Math.floor(remainingSpace / good.weight);
         const quantity = Math.floor(Math.random() * maxQuantity * (1 - good.rarity)) + 1;
-        inventory.push({ goodId: good.id, quantity });
+        const price = this.economySystem.getPrice(good.id, location.id);
+        inventory.push({ goodId: good.id, quantity, price });
         remainingSpace -= quantity * good.weight;
       }
       if (remainingSpace <= 0) break;
@@ -158,7 +132,7 @@ export class TraderSystem implements System {
     return Math.min(probability, 1);
   }
 
-  getTraderInventory(traderId: string): { goodId: string; quantity: number }[] | null {
+  getTraderInventory(traderId: string): InventoryItem[] | null {
     return this.state.inventories[traderId] || null;
   }
 
@@ -175,5 +149,68 @@ export class TraderSystem implements System {
     } else {
       Logger.error(`Trader not found: ${traderId}`);
     }
+  }
+
+  private restockTrader(trader: Trader): void {
+    const location = this.locations.find(loc => loc.id === trader.location);
+    if (location) {
+      this.state.inventories[trader.id] = this.generateInventory(trader, location);
+      Logger.log(`Restocked inventory for trader ${trader.id}`, 'INFO');
+    } else {
+      Logger.error(`Location not found for trader ${trader.id} during restock`);
+    }
+  }
+
+  buyFromTrader(traderId: string, goodId: string, quantity: number): number | null {
+    const traderInventory = this.state.inventories[traderId];
+    const item = traderInventory?.find(item => item.goodId === goodId);
+
+    if (!item || item.quantity < quantity) {
+      Logger.warn(`Insufficient quantity of ${goodId} available from trader ${traderId}`);
+      return null;
+    }
+
+    const totalCost = item.price * quantity;
+    item.quantity -= quantity;
+
+    if (item.quantity === 0) {
+      this.state.inventories[traderId] = traderInventory.filter(i => i.goodId !== goodId);
+    }
+
+    Logger.log(`Sold ${quantity} of ${goodId} to player for ${totalCost} credits`, 'INFO');
+    return totalCost;
+  }
+
+  sellToTrader(traderId: string, goodId: string, quantity: number, playerPrice: number): boolean {
+    const trader = this.state.traders.find(t => t.id === traderId);
+    if (!trader) {
+      Logger.error(`Trader not found: ${traderId}`);
+      return false;
+    }
+
+    const location = this.locations.find(loc => loc.id === trader.location);
+    if (!location) {
+      Logger.error(`Location not found for trader ${traderId}`);
+      return false;
+    }
+
+    const marketPrice = this.economySystem.getPrice(goodId, location.id);
+    if (playerPrice > marketPrice * 1.2) {  // Allow up to 20% markup
+      Logger.warn(`Price too high for trader ${traderId} to buy ${goodId}`);
+      return false;
+    }
+
+    const traderInventory = this.state.inventories[traderId];
+    const existingItem = traderInventory.find(item => item.goodId === goodId);
+
+    if (existingItem) {
+      existingItem.quantity += quantity;
+      existingItem.price = (existingItem.price * existingItem.quantity + playerPrice * quantity) / (existingItem.quantity + quantity);
+    } else {
+      traderInventory.push({ goodId, quantity, price: playerPrice });
+    }
+
+    Logger.log(`Bought ${quantity} of ${goodId} from player for ${playerPrice * quantity} credits`, 'INFO');
+    return true;
   }
 }
