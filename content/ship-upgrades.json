@@ -1,0 +1,47 @@
+[
+  {
+    "id": "CARGO_EXPAND",
+    "name": "Cargo Bay Expansion",
+    "description": "Increases cargo capacity by 50",
+    "cost": 5000,
+    "effect": {
+      "cargoCapacity": 50
+    }
+  },
+  {
+    "id": "FUEL_TANK",
+    "name": "Extended Fuel Tank",
+    "description": "Increases fuel capacity by 50",
+    "cost": 3000,
+    "effect": {
+      "fuelCapacity": 50
+    }
+  },
+  {
+    "id": "ENGINE_BOOST",
+    "name": "Engine Booster",
+    "description": "Increases speed by 0.2",
+    "cost": 7000,
+    "effect": {
+      "speed": 0.2
+    }
+  },
+  {
+    "id": "FUEL_EFFICIENCY",
+    "name": "Fuel Optimizer",
+    "description": "Improves fuel efficiency by 0.1",
+    "cost": 6000,
+    "effect": {
+      "fuelEfficiency": 0.1
+    }
+  },
+  {
+    "id": "HULL_REINFORCEMENT",
+    "name": "Hull Reinforcement",
+    "description": "Increases max health by 50",
+    "cost": 8000,
+    "effect": {
+      "maxHealth": 50
+    }
+  }
+]

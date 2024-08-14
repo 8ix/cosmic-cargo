@@ -1,0 +1,12 @@
+[
+    {
+      "id": "HUMAN001",
+      "name": "Human",
+      "traits": ["adaptable", "curious"]
+    },
+    {
+      "id": "ALIEN001",
+      "name": "Zorgon",
+      "traits": ["logical", "telepathic"]
+    }
+  ]

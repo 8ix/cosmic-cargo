@@ -1,0 +1,12 @@
+[
+    {
+      "id": "TRADER001",
+      "name": "John Doe",
+      "species": "HUMAN001",
+      "location": "EARTH001",
+      "specialization": "general",
+      "reputation": 0.7,
+      "inventorySize": 200,
+      "restockFrequency": 24
+    }
+  ]

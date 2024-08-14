@@ -1,0 +1,20 @@
+[ 
+    {
+        "id": "EARTH001",
+        "name": "Earth",
+        "coordinates": {"x": 0, "y": 0, "z": 0},
+        "description": "Cradle of humanity",
+        "dominantSpecies": "HUMAN001",
+        "economyType": "balanced",
+        "securityLevel": "high"
+  },
+  {
+        "id": "MARS001",
+        "name": "Mars Colony",
+        "coordinates": {"x": 100, "y": 0, "z": 0},
+        "description": "First human colony on Mars",
+        "dominantSpecies": "HUMAN001",
+        "economyType": "industrial",
+        "securityLevel": "medium"
+  }
+]

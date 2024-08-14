@@ -1,0 +1,29 @@
+[
+  {
+    "id": "FOOD001",
+    "name": "Standard Rations",
+    "weight": 1,
+    "basePrice": 10,
+    "lifespan": 30,
+    "contraband": false,
+    "rarity": 0.8,
+    "traderAffinity": {
+      "general": 0.8,
+      "blackMarket": 0.2,
+      "luxury": 0.5
+    }
+  },
+  {
+    "id": "FUEL001",
+    "name": "Standard Fuel",
+    "weight": 0.5,
+    "basePrice": 20,
+    "lifespan": null,
+    "contraband": false,
+    "rarity": 0.5,
+    "traderAffinity": {
+      "general": 0.9,
+      "industrial": 1.0
+    }
+  }
+]
